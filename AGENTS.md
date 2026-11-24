@@ -28,3 +28,5 @@ use the editor.
   own key and store it in Secrets.
 - **Secrets.** Lovable manages them. Do not put secret values in the repo.
 <!-- LOVABLE:END -->
+
+- Booking domain logic lives in src/lib/booking as pure TS (no React) so it is unit-tested and reused by UI validation and the reducer.

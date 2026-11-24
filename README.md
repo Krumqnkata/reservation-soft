@@ -1,29 +1,60 @@
-# Welcome to your Lovable project
+# Универсална система за резервации (React + Vite)
 
-This project was built with [Lovable](https://lovable.dev).
+Едно приложение, което обслужва различни бизнеси (кабинет, салон, заведение, коуъркинг зали) само чрез **конфигурация** и **симулирани данни**.
 
-## Build with Lovable
-
-Open your project in the [Lovable editor](https://lovable.dev) and keep building.
-
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: connect the project to GitHub and every change made in Lovable is committed straight to your repository.
-- **Full ownership**: this code is yours. Push to your repository and your changes sync back into Lovable, ready for your next prompt.
-
-## Development
-
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
-
-```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
-npm run dev
+## Стартиране
+```bash
+bun install      # или npm install
+bun run dev      # http://localhost:8080
+bunx vitest run  # тестове на алгоритмите
 ```
 
-## Built with
+## Архитектура
+```
+src/lib/booking/
+  types.ts   – универсален модел (BusinessConfig, Resource, Service, Booking)
+  data.ts    – 4 бизнес конфигурации + детерминиран генератор на симулирани резервации
+  index.ts   – индекс, двоично търсене, sweep-line проверка на капацитет, генериране на слотове
+  store.ts   – reducer (create / update / cancel) с валидация
+  booking.test.ts – тестове за припокриване, капацитет, работно време
+src/components/booking/BookingApp.tsx – интерфейс (филтри, слотове, форма, списък)
+```
+Логиката е чиста (без React) → тества се отделно и е преизползваема.
 
-- TanStack Start
-- TypeScript
-- React
-- Tailwind CSS
+## Модел на данните
+- **BusinessConfig**: работно време (`open`/`close` в минути), `slotStep`, `workDays`, `maxParty`, `resources`, `services`.
+- **Resource**: `capacity` – колко единици поема едновременно (лекар = 1, маса = 4, зала = 30), `tags` за филтриране.
+- **Service**: продължителност.
+- **Booking**: ресурс, ден, `start`/`end` (минути), `party` (брой хора/места).
+
+Нов вид бизнес = нов обект в `BUSINESSES`, без промяна на кода.
+
+## Оптимизация
+| Проблем | Решение | Сложност |
+|---|---|---|
+| Намиране на резервациите за ресурс/ден | `Map<"ресурс|ден", Booking[]>` | O(1) |
+| Отрязване на резервации след интервала | двоично търсене (`lowerBound`) върху сортирания масив | O(log n) |
+| Капацитет при частично припокриване | sweep line по събития (+party / −party) → пиков товар | O(k log k), k = засегнати |
+| Добавяне / отказ | инкрементално обновяване само на една кофа, без преиндексиране | O(n_кофа) |
+| Нормализирано състояние | `byId` + `index` в един `useReducer` | — |
+
+React:
+- `ResourceRow`, `Filters`, `BookingList` са `memo`; редът на ресурс преизчислява слотовете (`useMemo`) само когато се смени **неговата** кофа – индексът е immutable и непроменените кофи пазят референцията си.
+- Callback-ите са стабилни (`useCallback`), производните данни – `useMemo`.
+- Формата валидира на живо със същата функция като reducer-а → едни правила навсякъде.
+
+## Основен поток
+1. Избор на бизнес (горе вдясно) → цялата конфигурация се сменя.
+2. Избор на ден, услуга, етикет, „само свободни“.
+3. Клик върху свободен слот → попълнена форма → „Резервирай“.
+4. „Промени“ / „Откажи“ в списъка. Припокриване над капацитета се отказва с обяснение.
+
+## Екип и роли
+| Участник | Роля | Принос |
+|---|---|---|
+| Участник 1 | Модел на данните и конфигурации | `types.ts`, `data.ts` |
+| Участник 2 | Алгоритми и тестове | `index.ts`, `booking.test.ts` |
+| Участник 3 | Състояние и React оптимизация | `store.ts`, мемоизация |
+| Участник 4 | UI/UX и документация | `BookingApp.tsx`, README |
+
+> Заменете с реалните имена; всеки участник прави commit-и в своята част, за да е видим приносът в историята.
